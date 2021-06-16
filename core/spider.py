@@ -7,6 +7,8 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 
+from csv_handle import CsvHandle
+
 
 class YSpider(object):
     """youtube spider"""
@@ -23,7 +25,11 @@ class YSpider(object):
     ]
 
     def __init__(self, keyword):
-        self.__url = f'https://www.youtube.com/results?search_query={keyword}'
+        self.keyword = keyword
+
+        self.__base_url = 'https://www.youtube.com/'
+
+        self.__url = f'{self.__base_url}results?search_query={keyword}'
 
         self.__headers = {
             'user-agent': random.choice(self.UA_LIST)
@@ -38,6 +44,8 @@ class YSpider(object):
         self.__webrtc_path = './tools/Chrome/webrtc.crx'
 
         self.__opt = None
+
+        self.__driver = None
 
     def __create_opt(self):
         self.__opt = webdriver.ChromeOptions()
@@ -73,17 +81,16 @@ class YSpider(object):
 
     def __open_browser(self):
         self.__create_opt()
-        driver = self.__create_driver()
-        driver.get(self.__url)
+        self.driver = self.__create_driver()
+        self.driver.get(self.__url)
 
-        body = driver.find_element_by_tag_name('body')
+        body = self.driver.find_element_by_tag_name('body')
 
         time.sleep(5)
         while True:
-            contents = driver.find_element_by_id("contents")
-            con_num = len(contents.find_elements_by_xpath("//ytd-video-renderer"))
+            con_num = len(self.driver.find_elements_by_xpath("//ytd-video-renderer"))
 
-            if con_num >= 100:
+            if con_num >= 20:
                 print(con_num)
                 break
             else:
@@ -91,7 +98,30 @@ class YSpider(object):
             print(con_num)
 
     def __do(self):
-        pass
+        # 1.需求一
+        # 抓取日期 | 关键词 | 作者名称 | 认证状态 | 作者频道链接
+        contents_els = self.driver.find_elements_by_xpath(
+            "//ytd-video-renderer//div[@id='dismissible']/div/div[@id='channel-info']/ytd-channel-name")
+
+        csv_info = []
+        for con_els in contents_els:
+            author_el = con_els.find_element_by_xpath(".//a")
+            author = author_el.text
+            author_link = author_el.get_attribute('href')
+
+            auth_tag_el = con_els.find_elements_by_xpath("./ytd-badge-supported-renderer/div")
+            csv_info.append({
+                "author": author,
+                "author_link": author_link,
+                "auth_tag": auth_tag_el,
+                "keyword": self.keyword
+            })
+
+        # 1.1 写入csv
+        CsvHandle.tag = 1
+        CsvHandle.create_csv(csv_info)
+        # 2.需求二
 
     def run(self):
         self.__open_browser()
+        self.__do()
