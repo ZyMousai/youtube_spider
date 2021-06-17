@@ -1,8 +1,10 @@
 """
-spider
+处理需求一及整体流程
 """
 import random
 import time
+import uuid
+
 import pandas as pd
 import datetime
 from selenium import webdriver
@@ -62,7 +64,7 @@ class YSpider(object):
         self.__opt.binary_location = self.__chrome_path
 
     def __create_driver(self):
-        driver = webdriver.Chrome(executable_path=self.__chrome_driver_path, chrome_options=self.__opt)
+        driver = webdriver.Chrome(executable_path=self.__chrome_driver_path, options=self.__opt)
 
         with open(self.__js_path) as f:
             js = f.read()
@@ -78,7 +80,7 @@ class YSpider(object):
             body.send_keys(Keys.PAGE_DOWN)
             time.sleep(random.uniform(0.3, 0.5))
 
-    def __open_browser(self):
+    def __open_browser_one(self):
         self.__create_opt()
         self.driver = self.__create_driver()
         self.driver.get(self.__url)
@@ -94,7 +96,7 @@ class YSpider(object):
             else:
                 self.__down(body)
 
-    def __do(self):
+    def __do_one(self):
         # 1.需求一
         print('=========开始处理需求一')
         contents_els = self.driver.find_elements_by_xpath(
@@ -106,7 +108,7 @@ class YSpider(object):
         # 去重用list
         de_duplication_list = []
         # 去重后得list
-        csv_info = []
+        self.duplication_list = []
         print(f'=========成功拿到{len(contents_els)}条数据')
         print('=========开始处理数据')
         # 处理拿到得数据
@@ -122,7 +124,7 @@ class YSpider(object):
 
             if author_link not in de_duplication_list:
                 # 处理第二部需要用到得数据
-                csv_info.append({
+                self.duplication_list.append({
                     "author": author,
                     "author_link": author_link,
                     "auth_tag": author_tag,
@@ -136,13 +138,54 @@ class YSpider(object):
                 de_duplication_list.append(author_link)
         print(f'=========去重后数据还剩{len(de_duplication_list)}条数据')
         # 1.1 写入csv
-        csv_name = now_day + "&" + self.keyword + "&" + str(time.time()) + ".csv"
-        df1.to_csv(f"./result/{csv_name}", encoding='utf_8_sig')
+        # 每次运行的唯一标识
+        uuid_str = str(uuid.uuid1())
+        # 拼接csv名字
+        csv_name = now_day + "&" + self.keyword + "&" + 'one' + '&' + uuid_str + ".csv"
+        # 拼接csv路径
+        csv_path = f"./result/{csv_name}"
+        df1.to_csv(csv_path, encoding='utf_8_sig')
         print(f'=========需求一完成，已写入文件，|文件名{csv_name}|')
 
-        # 2.需求二
-        print('=========开始处理需求二')
+        self.__close_driver()
+
+    def do_two(self):
+        """
+        抓取日期 | 关键词 | 作者名称 | 认证状态 | 粉丝数量 | 作者频道链接 | 2个月内视频观看总数 | 2个月内视频发布总数 | 2个月内视频平均观看数 | 说明 | 商务咨询 | 位置 | 注册时间 | 观看总次数
+        """
+        wait_info = [
+            {
+                'author': 1,
+                'author_link': 'https://www.youtube.com/channel/UCTSCjjnCuAPHcfQWNNvULTw',
+                'keyword': 'light',
+                'auth_tag': 0
+            }
+        ]
+        self.__create_opt()
+        for index, info in enumerate(wait_info):
+            # 打开链接
+            driver = self.__create_driver()
+            driver.get(info['author_link'])
+
+            # 判断视频日期
+            body = self.driver.find_element_by_tag_name('body')
+
+            # todo
+
+            driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[2]/div').click()
+            time.sleep(3)
+
+    def __close_driver(self):
+        self.driver.close()
+        self.driver.quit()
 
     def run(self):
-        self.__open_browser()
-        self.__do()
+        self.__open_browser_one()
+        # 处理需求一
+        self.__do_one()
+        # 处理需求二
+        self.do_two()
+
+
+ax = YSpider('123')
+ax.do_two()
