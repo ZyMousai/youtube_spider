@@ -131,3 +131,6 @@ dmypy.json
 tools
 /tools
 /core/tools
+result
+/result
+/core/result
