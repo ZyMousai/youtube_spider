@@ -3,6 +3,7 @@
 """
 from spider import YSpider
 
+# 搜索词语
 SEARCH_KEYWORD = 'light'
 
 

@@ -3,11 +3,10 @@ spider
 """
 import random
 import time
-
+import pandas as pd
+import datetime
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-
-from csv_handle import CsvHandle
 
 
 class YSpider(object):
@@ -91,36 +90,58 @@ class YSpider(object):
             con_num = len(self.driver.find_elements_by_xpath("//ytd-video-renderer"))
 
             if con_num >= 20:
-                print(con_num)
                 break
             else:
                 self.__down(body)
-            print(con_num)
 
     def __do(self):
         # 1.需求一
-        # 抓取日期 | 关键词 | 作者名称 | 认证状态 | 作者频道链接
+        print('=========开始处理需求一')
         contents_els = self.driver.find_elements_by_xpath(
-            "//ytd-video-renderer//div[@id='dismissible']/div/div[@id='channel-info']/ytd-channel-name")
+            "//ytd-video-renderer//div[@id='dismissible']/div/div[@id='channel-info']/ytd-channel-name")[:1000]
+        # 建立处理csv所需数据
+        now_day = datetime.datetime.now().strftime("%Y-%m-%d")
+        df1 = pd.DataFrame(columns=("抓取日期", "关键词", "作者名称", "认证状态", "作者频道链接"))
 
+        # 去重用list
+        de_duplication_list = []
+        # 去重后得list
         csv_info = []
-        for con_els in contents_els:
+        print(f'=========成功拿到{len(contents_els)}条数据')
+        print('=========开始处理数据')
+        # 处理拿到得数据
+        for index, con_els in enumerate(contents_els):
             author_el = con_els.find_element_by_xpath(".//a")
+            # 获取作者名称
             author = author_el.text
+            # 获取作者频道链接
             author_link = author_el.get_attribute('href')
-
+            # 获取作者认证状态
             auth_tag_el = con_els.find_elements_by_xpath("./ytd-badge-supported-renderer/div")
-            csv_info.append({
-                "author": author,
-                "author_link": author_link,
-                "auth_tag": auth_tag_el,
-                "keyword": self.keyword
-            })
+            author_tag = 1 if auth_tag_el else 0
 
+            if author_link not in de_duplication_list:
+                # 处理第二部需要用到得数据
+                csv_info.append({
+                    "author": author,
+                    "author_link": author_link,
+                    "auth_tag": author_tag,
+                    "keyword": self.keyword
+                })
+
+                # 完善df1
+                df1.loc[index] = [now_day, self.keyword, author, author_tag, author_link]
+
+                # 去重
+                de_duplication_list.append(author_link)
+        print(f'=========去重后数据还剩{len(de_duplication_list)}条数据')
         # 1.1 写入csv
-        CsvHandle.tag = 1
-        CsvHandle.create_csv(csv_info)
+        csv_name = now_day + "&" + self.keyword + "&" + str(time.time()) + ".csv"
+        df1.to_csv(f"./result/{csv_name}", encoding='utf_8_sig')
+        print(f'=========需求一完成，已写入文件，|文件名{csv_name}|')
+
         # 2.需求二
+        print('=========开始处理需求二')
 
     def run(self):
         self.__open_browser()
