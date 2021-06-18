@@ -54,6 +54,9 @@ class YSpider(object):
         # todo 总共需要多少条数据，测试为20
         self.__need_data_num = 20
 
+        # todo 进程启动数量
+        self.__p_nums = 10
+
     def __create_opt(self):
         self.__opt = webdriver.ChromeOptions()
 
@@ -68,6 +71,8 @@ class YSpider(object):
         self.__opt.add_experimental_option("detach", True)
         # 二进制方式指定浏览器路径
         self.__opt.binary_location = self.__chrome_path
+
+        # self.__opt.add_argument('--headless')
 
     def __create_driver(self):
         driver = webdriver.Chrome(executable_path=self.__chrome_driver_path, options=self.__opt)
@@ -87,10 +92,11 @@ class YSpider(object):
             time.sleep(random.uniform(0.3, 0.5))
 
     def __open_browser_one(self):
+        print('=========准备打开浏览器')
         self.__create_opt()
         self.driver = self.__create_driver()
         self.driver.get(self.__url)
-
+        print('=========浏览器打开完毕，准备开始处理需求一')
         body = self.driver.find_element_by_tag_name('body')
 
         time.sleep(5)
@@ -182,100 +188,114 @@ class YSpider(object):
                                     "2个月内视频观看总数", "2个月内视频发布总数", "2个月内视频平均观看数",
                                     "说明", "商务咨询", "位置", "注册时间", "观看总数"))
 
+        # 加入进程池，开多个进程并发处理
+        from multiprocessing.dummy import Pool
+        pool = Pool(processes=self.__p_nums)
         for index, info in enumerate(wait_info):
-            print(f'=========需求二：开始处理第{index + 1}条数据')
-            # 打开链接
-            driver = self.__create_driver()
-            driver.get(info['author_link'])
-            # 判断视频日期
-            body = driver.find_element_by_tag_name('body')
-            # 点击切换到视频标签
-            driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[2]/div').click()
-            time.sleep(5)
+            pool.apply_async(self.__do_two, (index, info, df2, now_day))
 
-            while True:
-                date_els = driver.find_elements_by_xpath("//*[@id='metadata-line']/span[2]")
-                date_text_list = [date_el.text for date_el in date_els]
-                if '2个月前' or '1年前' or '2年前' or '3个月前' or '4个月前' or '5个月前' or '6个月前' or '7个月前' \
-                        or '8个月前' or '9个月前' or '10个月前' or '11个月前' in date_text_list:
-                    break
-                else:
-                    self.__down(body, 5)
+        # 主进程等待所有子进程执行完毕在继续
+        pool.close()
+        pool.join()
 
-            time.sleep(5)
-            # 获取两个月内得视频个数
-            videos_el_list = []
-            videos_els = driver.find_elements_by_xpath('//ytd-grid-video-renderer')
-            for videos_el in videos_els:
-                videos_date = videos_el.find_element_by_xpath(".//*[@id='metadata-line']/span[2]").text
-                if '年' in videos_date:
-                    break
-                elif '月' in videos_date:
-                    if '1个月前' == videos_date:
-                        videos_el_list.append(videos_el)
-                elif '小时' in videos_date or '天' in videos_date or '周' in videos_date:
-                    videos_el_list.append(videos_el)
-                else:
-                    pass
-
-            total_play_nums = 0
-            # 获取两个月内视频播放总数
-            for v_el in videos_el_list:
-                play_nums = v_el.find_element_by_xpath(".//*[@id='metadata-line']/span[1]").text
-                if '万' in play_nums:
-                    curr_play_nums = float(play_nums.split('万')[0]) * 10000
-                    total_play_nums += curr_play_nums
-                else:
-                    total_play_nums += float(play_nums.split('次')[0])
-
-            # 两个月内平均观看数量
-            mid_play_nums = total_play_nums / 2
-            # 粉丝数量
-            fans_num = driver.find_element_by_xpath('//*[@id="subscriber-count"]').text
-
-            # 切换到简介
-            driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[6]/div').click()
-            time.sleep(3)
-            # 说明
-            description = driver.find_element_by_xpath('//*[@id="description"]').text
-            # 位置
-            address_els = driver.find_elements_by_xpath(
-                '//*[@id="details-container"]/table/tbody/tr[2]/td[2]/yt-formatted-string')
-            if address_els:
-                address = address_els[0].text
-            else:
-                address = None
-            # 注册时间
-            si_date = driver.find_element_by_xpath('//*[@id="right-column"]/yt-formatted-string[2]/span[1]').text
-            # 观看总数
-            all_total_play_nums = driver.find_element_by_xpath('//*[@id="right-column"]/yt-formatted-string[3]').text
-            # todo 商务咨询，需要过谷歌验证码
-            b_aff = None
-
-            """
-                    df2 = pd.DataFrame(columns=("抓取日期", "关键词", "作者名称", "认证状态", "粉丝数量", "作者频道链接",
-                                    "2个月内视频观看总数", "2个月内视频发布总数", "2个月内视频平均观看数",
-                                    "说明", "商务咨询", "位置", "注册时间", "观看总数"))
-            """
-            # 完善df2
-            df2.loc[index] = [now_day, self.keyword, info['author'], info['auth_tag'], fans_num, info['author_link'],
-                              total_play_nums, len(videos_el_list), mid_play_nums, description, b_aff, address, si_date,
-                              all_total_play_nums]
-            print(f'=========需求二，第{index + 1}条数据处理完毕')
-
-            driver.close()
-            driver.quit()
-
-            time.sleep(random.randint(2, 4))
         # 2.1需求二写入
         # 拼接csv名字
         csv_name = now_day + "&" + self.keyword + "&" + 'two' + '&' + self.uuid_str + ".csv"
         # 拼接csv路径
         csv_path = f"./result/{csv_name}"
         df2.to_csv(csv_path, encoding='utf_8_sig')
-        print(f'=========需求一完成，已写入文件，|文件名{csv_name}|')
+        print(f'=========需求二完成，已写入文件，|文件名{csv_name}|')
+
+    def __do_two(self, index, info, df2, now_day):
+        print(f'=========需求二：开始处理第{index + 1}条数据')
+        # 打开链接
+        driver = self.__create_driver()
+        driver.get(info['author_link'])
+        # 判断视频日期
+        body = driver.find_element_by_tag_name('body')
+        # 点击切换到视频标签
+        driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[2]/div').click()
+        time.sleep(5)
+
+        while True:
+            date_els = driver.find_elements_by_xpath("//*[@id='metadata-line']/span[2]")
+            date_text_list = [date_el.text for date_el in date_els]
+            if '2个月前' or '1年前' or '2年前' or '3个月前' or '4个月前' or '5个月前' or '6个月前' or '7个月前' \
+                    or '8个月前' or '9个月前' or '10个月前' or '11个月前' in date_text_list:
+                break
+            else:
+                self.__down(body, 5)
+
+        time.sleep(5)
+        # 获取两个月内得视频个数
+        videos_el_list = []
+        videos_els = driver.find_elements_by_xpath('//ytd-grid-video-renderer')
+        for videos_el in videos_els:
+            videos_date = videos_el.find_element_by_xpath(".//*[@id='metadata-line']/span[2]").text
+            if '年' in videos_date:
+                break
+            elif '月' in videos_date:
+                if '1个月前' == videos_date:
+                    videos_el_list.append(videos_el)
+            elif '小时' in videos_date or '天' in videos_date or '周' in videos_date:
+                videos_el_list.append(videos_el)
+            else:
+                pass
+
+        total_play_nums = 0
+        # 获取两个月内视频播放总数
+        for v_el in videos_el_list:
+            play_nums = v_el.find_element_by_xpath(".//*[@id='metadata-line']/span[1]").text
+            if '万' in play_nums:
+                curr_play_nums = float(play_nums.split('万')[0]) * 10000
+                total_play_nums += curr_play_nums
+            elif '无人观看' in play_nums:
+                pass
+            else:
+                total_play_nums += float(play_nums.split('次')[0])
+
+        # 两个月内平均观看数量
+        mid_play_nums = total_play_nums / 2
+        # 粉丝数量
+        fans_num = driver.find_element_by_xpath('//*[@id="subscriber-count"]').text
+
+        # 切换到简介
+        driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[6]/div').click()
+        time.sleep(3)
+        # 说明
+        description = driver.find_element_by_xpath('//*[@id="description"]').text
+        # 位置
+        address_els = driver.find_elements_by_xpath(
+            '//*[@id="details-container"]/table/tbody/tr[2]/td[2]/yt-formatted-string')
+        if address_els:
+            address = address_els[0].text
+        else:
+            address = None
+        # 注册时间
+        si_date = driver.find_element_by_xpath('//*[@id="right-column"]/yt-formatted-string[2]/span[1]').text
+        # 观看总数
+        all_total_play_nums = driver.find_element_by_xpath('//*[@id="right-column"]/yt-formatted-string[3]').text
+        # todo 商务咨询，需要过谷歌验证码
+        b_aff = None
+
+        """
+                df2 = pd.DataFrame(columns=("抓取日期", "关键词", "作者名称", "认证状态", "粉丝数量", "作者频道链接",
+                                "2个月内视频观看总数", "2个月内视频发布总数", "2个月内视频平均观看数",
+                                "说明", "商务咨询", "位置", "注册时间", "观看总数"))
+        """
+        # 完善df2
+        df2.loc[index] = [now_day, self.keyword, info['author'], info['auth_tag'], fans_num, info['author_link'],
+                          total_play_nums, len(videos_el_list), mid_play_nums, description, b_aff, address, si_date,
+                          all_total_play_nums]
+        print(f'=========需求二，第{index + 1}条数据处理完毕')
+
+        driver.close()
+        driver.quit()
+
+        time.sleep(random.randint(2, 4))
 
     def run(self):
+        print(f'=========关键词为：{self.keyword}')
         self.__open_browser_one()
         # 处理需求一
         self.__do_one()
