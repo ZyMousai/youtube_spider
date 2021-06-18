@@ -51,7 +51,7 @@ class YSpider(object):
         # 每次运行的唯一标识
         self.uuid_str = str(uuid.uuid1())
 
-        # 总共需要多少条数据
+        # todo 总共需要多少条数据，测试为20
         self.__need_data_num = 20
 
     def __create_opt(self):
@@ -160,7 +160,7 @@ class YSpider(object):
         :return:
         """
         print('=========开始处理需求二')
-        # todo 模拟数据
+        # todo 模拟数据, 正式运营处理的是self.duplication_list，而不是wait_info
         wait_info = [
             {
                 'author': 'NairoMK',
