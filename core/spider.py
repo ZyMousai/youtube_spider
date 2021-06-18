@@ -152,7 +152,8 @@ class YSpider(object):
         df1.to_csv(csv_path, encoding='utf_8_sig')
         print(f'=========需求一完成，已写入文件，|文件名{csv_name}|')
 
-        self.__close_driver()
+        self.driver.close()
+        self.driver.quit()
 
     def do_two(self):
         """
@@ -161,14 +162,18 @@ class YSpider(object):
         """
         print('=========开始处理需求二')
         # todo 模拟数据, 正式运营处理的是self.duplication_list，而不是wait_info
-        wait_info = [
-            {
-                'author': 'NairoMK',
-                'author_link': 'https://www.youtube.com/channel/UCTSCjjnCuAPHcfQWNNvULTw',
-                'keyword': 'light',
-                'auth_tag': 0
-            }
-        ]
+        # wait_info = [
+        #     {
+        #         'author': 'NairoMK',
+        #         'author_link': 'https://www.youtube.com/channel/UCTSCjjnCuAPHcfQWNNvULTw',
+        #         'keyword': 'light',
+        #         'auth_tag': 0
+        #     }
+        # ]
+
+        # todo 正式运行使用这个
+        wait_info = self.duplication_list
+
         # 2.需求二
         self.__create_opt()
 
@@ -176,6 +181,7 @@ class YSpider(object):
         df2 = pd.DataFrame(columns=("抓取日期", "关键词", "作者名称", "认证状态", "粉丝数量", "作者频道链接",
                                     "2个月内视频观看总数", "2个月内视频发布总数", "2个月内视频平均观看数",
                                     "说明", "商务咨询", "位置", "注册时间", "观看总数"))
+
         for index, info in enumerate(wait_info):
             print(f'=========需求二：开始处理第{index + 1}条数据')
             # 打开链接
@@ -185,12 +191,13 @@ class YSpider(object):
             body = driver.find_element_by_tag_name('body')
             # 点击切换到视频标签
             driver.find_element_by_xpath('//*[@id="tabsContent"]/tp-yt-paper-tab[2]/div').click()
-            time.sleep(3)
+            time.sleep(5)
 
             while True:
                 date_els = driver.find_elements_by_xpath("//*[@id='metadata-line']/span[2]")
                 date_text_list = [date_el.text for date_el in date_els]
-                if '2个月前' in date_text_list:
+                if '2个月前' or '1年前' or '2年前' or '3个月前' or '4个月前' or '5个月前' or '6个月前' or '7个月前' \
+                        or '8个月前' or '9个月前' or '10个月前' or '11个月前' in date_text_list:
                     break
                 else:
                     self.__down(body, 5)
@@ -256,6 +263,10 @@ class YSpider(object):
                               all_total_play_nums]
             print(f'=========需求二，第{index + 1}条数据处理完毕')
 
+            driver.close()
+            driver.quit()
+
+            time.sleep(random.randint(2, 4))
         # 2.1需求二写入
         # 拼接csv名字
         csv_name = now_day + "&" + self.keyword + "&" + 'two' + '&' + self.uuid_str + ".csv"
@@ -264,10 +275,6 @@ class YSpider(object):
         df2.to_csv(csv_path, encoding='utf_8_sig')
         print(f'=========需求一完成，已写入文件，|文件名{csv_name}|')
 
-    def __close_driver(self):
-        self.driver.close()
-        self.driver.quit()
-
     def run(self):
         self.__open_browser_one()
         # 处理需求一
@@ -275,6 +282,5 @@ class YSpider(object):
         # 处理需求二
         self.do_two()
 
-
-ax = YSpider('light')
-ax.do_two()
+# ax = YSpider('light')
+# ax.do_two()
