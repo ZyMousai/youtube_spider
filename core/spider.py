@@ -72,7 +72,7 @@ class YSpider(object):
         # 二进制方式指定浏览器路径
         self.__opt.binary_location = self.__chrome_path
 
-        # self.__opt.add_argument('--headless')
+        self.__opt.add_argument('--headless')
 
     def __create_driver(self):
         driver = webdriver.Chrome(executable_path=self.__chrome_driver_path, options=self.__opt)
